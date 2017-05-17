@@ -33,7 +33,7 @@ namespace zipto7z
                 inmemory = true;
             if (nvcargs.AllKeys.Contains("delete"))
                 deleteafterconvert = true;
-
+            //Console.Write("Memory argument: {0}   Delete argument: {1}", inmemory, deleteafterconvert);
             if (args.Length >= 1 && File.Exists(args[0]))
             {
                 if (!inmemory)
@@ -125,13 +125,17 @@ namespace zipto7z
                         {
                             //follows "-switch -switch2"
                             nvc.Add(args[i].Substring(indexOfSwitch(args[i])), null);
-                            i++;
+
                             continue;
                         }
                     }
-                    //Not a switch or an argument to a switch?  
-                    //nvc.Add(null, args[i]);
-                    nvc.Add(i.ToString(), args[i]);
+                    else
+                    {
+                        if (indexOfSwitch(args[i]) != 0)
+                            nvc.Add(args[i].Substring(indexOfSwitch(args[i])), null);
+                        else  //Not a switch or an argument to a switch?  
+                            nvc.Add(i.ToString(), args[i]);
+                    }
                 }
             }
 
