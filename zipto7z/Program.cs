@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
 using System.Text;
 using System.IO;
 
@@ -7,6 +9,7 @@ namespace zipto7z
 {
     public class Program
     {
+
         public static string s7zlocation;
         static int Main(string[] args)
         {
@@ -23,47 +26,82 @@ namespace zipto7z
             Console.WriteLine("7z DLL loaded from " + s7zlocation);
             SevenZip.SevenZipBase.SetLibraryPath(s7zlocation);
 
+            NameValueCollection nvcargs = GetArguments(args);
+            bool inmemory = false;
+            bool deleteafterconvert = false;
+            if (nvcargs.AllKeys.Contains("memory"))
+                inmemory = true;
+            if (nvcargs.AllKeys.Contains("delete"))
+                deleteafterconvert = true;
+
             if (args.Length >= 1 && File.Exists(args[0]))
-                ConvertZip(args[0]);
-
-
+            {
+                if (!inmemory)
+                    convertZipInFileSystem(args[0]);
+                else
+                    convertZipinMemory(args[0]);
+                if (deleteafterconvert)
+                    File.Delete(args[0]);
+            }
             return 0;
         }
 
 
-        public static void ConvertZip(string zipfile)
+        public static void convertZipInFileSystem(string zipfile)
+        {
+            FileStream _7zfile = File.Create(Path.GetFileNameWithoutExtension(zipfile) + ".7z");
+            SevenZip.SevenZipExtractor ze = new SevenZip.SevenZipExtractor(zipfile);
+            string tempdirectory = Path.Combine(Environment.CurrentDirectory, zipfile + "7z");
+            Directory.CreateDirectory(tempdirectory);
+            ze.ExtractArchive(tempdirectory);
+            ze.Dispose();
+
+            SevenZip.SevenZipCompressor _7zc = new SevenZip.SevenZipCompressor();
+            Dictionary<string, string> newentry = new Dictionary<string, string>();
+            _7zc.ArchiveFormat = SevenZip.OutArchiveFormat.SevenZip;
+            _7zc.CompressionLevel = SevenZip.CompressionLevel.High;
+            _7zc.CompressionMode = SevenZip.CompressionMode.Create;
+            _7zc.DirectoryStructure = true;
+            _7zc.FastCompression = true;
+            Console.WriteLine("Beginning compression.  This will take a while...");
+            _7zc.CompressDirectory(tempdirectory, _7zfile);
+
+
+            _7zfile.Close();
+            Directory.Delete(tempdirectory, true);
+            Console.WriteLine("Done.");
+        }
+
+
+        public static void convertZipinMemory(string zipfile)
         {
             FileStream _7zfile = File.Create(Path.GetFileNameWithoutExtension(zipfile) + ".7z");
             Unzipper unzipfile = new Unzipper(zipfile);
 
             SevenZip.SevenZipCompressor _7zc = new SevenZip.SevenZipCompressor();
             Dictionary<string, Stream> newentry = new Dictionary<string, Stream>();
+            _7zc.ArchiveFormat = SevenZip.OutArchiveFormat.SevenZip;
+            _7zc.CompressionLevel = SevenZip.CompressionLevel.High;
+            _7zc.CompressionMode = SevenZip.CompressionMode.Create;
+            _7zc.PreserveDirectoryRoot = true;
+            _7zc.DirectoryStructure = true;
+            _7zc.FastCompression = true;
+
             foreach (string x in unzipfile.GetNextEntry())
             {
-
-                
-                _7zc.ArchiveFormat = SevenZip.OutArchiveFormat.SevenZip;
-                _7zc.CompressionLevel = SevenZip.CompressionLevel.High;
-                _7zc.CompressionMode = SevenZip.CompressionMode.Create;
-                _7zc.PreserveDirectoryRoot = true;
-                _7zc.DirectoryStructure = true;
-                _7zc.FastCompression = true;
-                
-                Console.WriteLine(x);
                 System.IO.MemoryStream extractedzipfileentry = new MemoryStream();
                 unzipfile.fz.ExtractFile(x, extractedzipfileentry);
                 extractedzipfileentry.Position = 0;
-                
 
-                
                 newentry.Add(x, extractedzipfileentry);
-                //_7zc.CompressStream(extractedzipfileentry, _7zfile);
-                
+
             }
+            Console.WriteLine("Loaded {0} entries, beginning compression.  This will take a while...", newentry.Count);
             _7zc.CompressStreamDictionary(newentry, _7zfile);
 
             unzipfile.Dispose();
             _7zfile.Close();
+            Console.WriteLine("Done.");
         }
 
 
@@ -184,4 +222,5 @@ namespace zipto7z
         #endregion
 
     }
+
 }
